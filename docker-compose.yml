@@ -1,0 +1,27 @@
+services:
+  api:
+    build: ./
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=${PORT:-3000}
+      - CORS_WHITELIST_REGEXP=${CORS_WHITELIST_REGEXP}
+      - GLOBAL_THROTTLE_TTL=${GLOBAL_THROTTLE_TTL:-5}
+      - GLOBAL_THROTTLE_LIMIT=${GLOBAL_THROTTLE_LIMIT:-100}
+      - GLOBAL_CACHE_TTL=${GLOBAL_CACHE_TTL:-1}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - KEYS_API_HOST=${KEYS_API_HOST}
+      - EL_API_URLS=${EL_API_URLS}
+      - CHAIN_ID=${CHAIN_ID}
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    healthcheck:
+      test: wget -nv -t1 --spider http://127.0.0.1:$PORT/health > /dev/null || exit 1
+      interval: 10s
+      retries: 5
+      start_period: 5s
+      timeout: 10s
