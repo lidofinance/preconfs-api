@@ -1,4 +1,4 @@
 export interface ResolvedKey {
-  proxyKey: string;
+  pubKey: string;
   rpcUrl: string;
 }

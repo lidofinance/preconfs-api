@@ -7,21 +7,22 @@ import {
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { KapiService } from '../../clients/kapi/kapi.service';
 import * as E from 'fp-ts/Either';
-import { SimpleFallbackJsonRpcBatchProvider } from '@lido-nestjs/execution';
-import { ConfigService } from '../../common/config';
-import { Curator, Curator__factory } from './contracts';
 import { ResolvedKey } from './validator-keys-resolver.interfaces';
 import { ZodError } from 'zod';
-import { Operator } from '../../clients/kapi/entity/common';
+import {
+  CREDIBLE_COMMITMENT_CURATION_PROVIDER_TOKEN,
+  CredibleCommitmentCurationProvider,
+} from '../../contracts';
+import { OperatorsResponse } from '../../clients/kapi/entity/operator.response';
 
 @Injectable()
 export class ValidatorKeysResolver {
   constructor(
     @Inject(WINSTON_MODULE_NEST_PROVIDER)
     private readonly logger: LoggerService,
-    private readonly provider: SimpleFallbackJsonRpcBatchProvider,
+    @Inject(CREDIBLE_COMMITMENT_CURATION_PROVIDER_TOKEN)
+    private contract: CredibleCommitmentCurationProvider,
     private readonly kapiService: KapiService,
-    private readonly configService: ConfigService,
   ) {}
 
   public async resolve(
@@ -45,41 +46,37 @@ export class ValidatorKeysResolver {
     }
 
     const keys = keysResponse.right.data;
-    const operatorByModuleAndIndex = new Map<string, Operator>();
-    for (const x of operatorsResponse.right.data) {
-      for (const operator of x.operators) {
-        operatorByModuleAndIndex.set(
-          `${x.module.stakingModuleAddress}|${operator.index}`,
-          operator,
-        );
-      }
-    }
+    const operatorByModuleAndIndex = this.indexModulesAndOperators(
+      operatorsResponse.right,
+    );
 
     try {
-      const contract = this.getContract();
-
       const data = await Promise.all(
         keys.map(async (key) => {
-          const operator = operatorByModuleAndIndex.get(
-            `${key.moduleAddress}|${key.operatorIndex}`,
+          const operatorInfo = operatorByModuleAndIndex.find(
+            key.moduleAddress,
+            key.operatorIndex,
           );
-          if (!operator) {
+          if (!operatorInfo) {
             return;
           }
-          const contractResponse = await contract.getOperator(
-            operator.rewardAddress,
+          const contractResponse = await this.getOperator(
+            operatorInfo.moduleId,
+            operatorInfo.operatorId,
           );
           if (!contractResponse) {
             return;
           }
-          if (
-            contractResponse.keysRangeStart.lte(key.index) &&
-            contractResponse.keysRangeEnd.gte(key.index)
-          ) {
+          if (!contractResponse.isEnabled) {
+            return;
+          }
+          const { indexStart, indexEnd } =
+            contractResponse.state.keysRangeState;
+
+          if (indexStart.lte(key.index) && indexEnd.gte(key.index)) {
             return {
               pubKey: key.key,
-              proxyKey: contractResponse.optInAddress,
-              rpcUrl: contractResponse.rpcURL,
+              rpcUrl: contractResponse.state.extraData.rpcURL,
             };
           }
         }),
@@ -91,8 +88,53 @@ export class ValidatorKeysResolver {
     }
   }
 
-  private getContract(): Curator {
-    const address = this.configService.get('CURATOR_ADDRESS');
-    return Curator__factory.connect(address, this.provider);
+  private async getOperator(moduleId: number, operatorId: number) {
+    try {
+      return await this.contract['getOperator(uint24,uint64)'](
+        moduleId,
+        operatorId,
+      );
+    } catch (error) {
+      const anyError = error as any;
+      const expectedErrorNames = [
+        'OperatorNotActive',
+        'OperatorNotRegistered',
+        'ModuleDisabled',
+      ];
+      if (
+        anyError.code !== 'CALL_EXCEPTION' &&
+        !expectedErrorNames.includes(anyError.errorName)
+      ) {
+        this.logger.error('Unexpected error while calling CCCP contract', {
+          error,
+        });
+      }
+      return null;
+    }
+  }
+
+  private indexModulesAndOperators(response: OperatorsResponse) {
+    const key = (moduleAddress: string, operatorId: number) =>
+      `${moduleAddress}|${operatorId}`;
+
+    const operatorByModuleAndIndex = new Map<
+      string,
+      { moduleId: number; operatorId: number }
+    >();
+    for (const x of response.data) {
+      for (const operator of x.operators) {
+        const operatorKey = key(x.module.stakingModuleAddress, operator.index);
+        operatorByModuleAndIndex.set(operatorKey, {
+          moduleId: x.module.id,
+          operatorId: operator.index,
+        });
+      }
+    }
+
+    return {
+      find: (moduleAddress: string, operatorId: number) => {
+        return operatorByModuleAndIndex.get(key(moduleAddress, operatorId));
+      },
+    };
   }
 }
