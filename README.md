@@ -69,7 +69,6 @@ Content-Type: application/json
   "data": [
     {
       "pubKey": "0x5ff0d5508850142615b6766ace748cad0f11b725b0a4c1f9609f4e37b1989ae17b8f0e5e1af7cc60e2a7cfd380828589",
-      "proxyKey": "0xD2D35dBEdea1E4f0C3448f31dDCd1e499d88EB8c",
       "rpcUrl": "https://example.domain:8017/"
     }
   ]
