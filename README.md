@@ -3,20 +3,20 @@
 ### Overview
 
 The Preconf API checks whether a validator is part of Lido and has opted into preconfirmations via
-the [CCCP](https://github.com/lidofinance/crediblecommitments) contract.  
+the [CCR](https://github.com/lidofinance/crediblecommitments) contract.  
 This service primarily acts as a wrapper around the [KAPI](https://github.com/lidofinance/lido-keys-api) and
-the [CCCP contract](https://github.com/lidofinance/crediblecommitments).
+the [CCR contract](https://github.com/lidofinance/crediblecommitments).
 
 ### Requirements
 
 - **KAPI**: For setup instructions, please refer to the [documentation](https://docs.lido.fi/guides/kapi-guide/).
-- **Execution Layer client**: Required to access the `CCCP` contract.
+- **Execution Layer client**: Required to access the `CCR` contract.
 - **Node.js/Yarn** or **Docker**: To run the service.
 
 ### How to Run
 
 1. Copy `sample.env` to `.env` and fill it with actual values. The most important variables are the `KAPI` URI and the
-   `CCCP` contract address.
+   `CCR` contract address.
 2. Run the service via `yarn` or `docker`.
 
 #### Watch Mode
@@ -82,6 +82,6 @@ The following environment variables are **required**:
 | Name              | Description                                    |
 |-------------------|------------------------------------------------|
 | `KEYS_API_HOST`   | URI of the Keys API                            |
-| `CURATOR_ADDRESS` | Address of the CCCP contract                   |
+| `CURATOR_ADDRESS` | Address of the CCR contract                   |
 | `EL_API_URLS`     | URIs of the Execution Layer clients            |
 | `CHAIN_ID`        | Chain ID: `1` for mainnet, `17000` for Holesky |
